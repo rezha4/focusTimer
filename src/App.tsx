@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import BreakTimer from "./BreakTimer";
 
 interface Session {
   id: string;
@@ -9,7 +10,7 @@ interface Session {
 
 function App() {
   const THETIME = 60 * 25;
-  const BREAKTIME = 5;
+  const DEFAULT_BREAK_TIME = 60 * 5; // 5 minutes in seconds
 
   const [time, setTime] = useState(THETIME); // 25 minutes in seconds
   const [isRunning, setIsRunning] = useState(false);
@@ -17,6 +18,27 @@ function App() {
   const [sessionCount, setSessionCount] = useState(0);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isBreak, setIsBreak] = useState(false);
+  const [breakTime, setBreakTime] = useState(0);
+
+  useEffect(() => {
+    const updateTitle = () => {
+      const { minutes, seconds } = formatTime(time);
+      const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      
+      if (isRunning) {
+        document.title = `Focus: ${timeString}`;
+      } else {
+        document.title = 'focusTimer';
+      }
+    };
+
+    updateTitle();
+
+    // Update title every second when timer is running
+    const titleInterval = setInterval(updateTitle, 1000);
+
+    return () => clearInterval(titleInterval);
+  }, [isRunning, isBreak, time]);
 
   useEffect(() => {
     loadSessions();
@@ -33,8 +55,11 @@ function App() {
   };
 
   useEffect(() => {
+    // interval variable
     let interval: number | null = null;
+    // if isRunning (not paused)
     if (isRunning) {
+      // interval equals function?
       interval = setInterval(() => {
         setTime((prevTime) => {
           if (prevTime === 0 && !isCountingUp) {
@@ -50,7 +75,7 @@ function App() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isRunning, isCountingUp, isBreak]);
+  }, [isRunning, isCountingUp]);
 
   const toggleTimer = () => {
     if (!isRunning) {
@@ -67,10 +92,13 @@ function App() {
 
   const handleFinish = () => {
     const today = new Date().toLocaleDateString();
+
+    const duration = isCountingUp ? time : THETIME - time;
+
     const newSession = {
       id: Date.now().toString(),
       date: today,
-      duration: time,
+      duration: duration,
       isCountingUp: isCountingUp,
     };
 
@@ -94,7 +122,11 @@ function App() {
         formatTime(time).minutes
       }:${formatTime(time).seconds}`
     );
+    
     resetTimer();
+    const breaktime = calculateBreakTime(duration);
+    setBreakTime(breaktime);
+    setIsBreak(true);
   };
 
   const deleteSession = (sessionId: string) => {
@@ -124,18 +156,34 @@ function App() {
     return { minutes: mins, seconds: secs };
   };
 
+  const calculateBreakTime = (workTime: number) => {
+    if (workTime < THETIME) {
+      // If work time is less than 25 minutes
+      const percentage = workTime / THETIME;
+      return Math.floor(DEFAULT_BREAK_TIME * percentage);
+    } else {
+      // If work time is 25 minutes or more
+      const extraTime = workTime - THETIME;
+      const extraBreakTime = Math.floor(extraTime * 0.1); // 10% of extra time
+      return DEFAULT_BREAK_TIME + extraBreakTime;
+    }
+  };
+
   const { minutes, seconds } = formatTime(time);
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-base-200">
       <div className="text-center">
-        <h1 className="text-4xl font-bold mb-8">
+        <h1 className="mb-8 text-4xl font-bold">
           focusTimer, Pomodoro + Flow Time Time Tracker
         </h1>
+        <div>
+          <BreakTimer isBreak={isBreak} breakTime={breakTime} setIsBreak={setIsBreak} />
+        </div>
         <div className="flex justify-center">
           <div className="grid grid-flow-col gap-5 text-center auto-cols-max">
             <div className="flex flex-col">
-              <span className="countdown font-mono text-5xl">
+              <span className="font-mono text-5xl countdown">
                 <span
                   style={{ "--value": minutes } as React.CSSProperties}
                 ></span>
@@ -143,7 +191,7 @@ function App() {
               min
             </div>
             <div className="flex flex-col">
-              <span className="countdown font-mono text-5xl">
+              <span className="font-mono text-5xl countdown">
                 <span
                   style={{ "--value": seconds } as React.CSSProperties}
                 ></span>
@@ -154,14 +202,16 @@ function App() {
         </div>
         <div className="mt-8">
           <button
-            className="btn btn-primary mr-4"
+            className="mr-4 btn btn-primary"
             onClick={toggleTimer}
+            disabled={isBreak}
           >
             {isRunning ? "Pause" : "Start"}
           </button>
           <button
             className="btn btn-secondary"
             onClick={handleFinish}
+            disabled={isBreak}
           >
             Finish
           </button>
@@ -175,7 +225,7 @@ function App() {
           Completed sessions today: {sessionCount}
         </p>
         <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">
+          <h2 className="mb-4 text-2xl font-bold">
             Today's Sessions
           </h2>
           <ul className="list-disc list-inside">
