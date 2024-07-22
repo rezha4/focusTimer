@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from "react";
 import BreakTimer from "./BreakTimer";
+import bullseye from "./assets/bullseye.ico";
+import running from "./assets/running.ico";
+import runningUp from "./assets/runningUp.ico";
+import breaks from "./assets/breaks.ico";
 
 interface Session {
   id: string;
@@ -21,23 +25,37 @@ function App() {
   const [breakTime, setBreakTime] = useState(0);
 
   useEffect(() => {
-    const updateTitle = () => {
+    const updateTitleAndFavicon = () => {
       const { minutes, seconds } = formatTime(time);
       const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
       
+      let favicon;
       if (isRunning) {
         document.title = `Focus: ${timeString}`;
+        favicon = isCountingUp ? runningUp : running;
+      } else if (isBreak) {
+        favicon = breaks;
       } else {
         document.title = 'focusTimer';
+        favicon = bullseye;
+      }
+
+      // Update favicon
+      const linkElements = document.getElementsByTagName('link');
+      for (let i = 0; i < linkElements.length; i++) {
+        const link = linkElements[i];
+        if (link.rel === 'icon' || link.rel === 'shortcut icon') {
+          link.href = favicon;
+        }
       }
     };
 
-    updateTitle();
+    updateTitleAndFavicon();
 
-    // Update title every second when timer is running
-    const titleInterval = setInterval(updateTitle, 1000);
+    // Update title and favicon every second when timer is running
+    const interval = setInterval(updateTitleAndFavicon, 1000);
 
-    return () => clearInterval(titleInterval);
+    return () => clearInterval(interval);
   }, [isRunning, isBreak, time]);
 
   useEffect(() => {
